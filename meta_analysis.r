@@ -1,4 +1,4 @@
-## Meta analysis of braak NFT stage in R -  extract z values, SE and apply bacon
+## Meta analysis of braak NFT stage in R
 ## Author: Gemma Shireby
 ## date: 29.03.2021
 
@@ -80,15 +80,16 @@ Braak_meta <- function(i){
 
 }
 
-###Run EWAS using foreach() and %dopar% to tell R to run the analysis is parallel
 
 Out <- mclapply(1:length(probes), Braak_meta,mc.cores=20) # returns list
 res <- do.call(rbind,Out) # make list a matrix
 
+## extract data 
 res<-as.data.frame(res)
 rownames(res)<-probes
 colnames(res)<-c("Effect_fixed", "P_fixed", "Z_fixed", "SE.fixed", "lower.fixed_CI", "upper.fixed_CI", "Effect_random", "P_random", "Z_random","SE.random", "lower.random_CI", "upper.random_CI" ,"I2", "Het P") # must have SE and Z values for bacon
 
+## save folder
 write.csv(res, "")
 
 ## Check inflation
