@@ -12,7 +12,7 @@ setwd("")
 library(lmerTest)
 library(bacon)
 library(ggplot2)
-library(sva)
+
 
 ## load files 
 
@@ -23,37 +23,68 @@ betas<-betas[,match(pheno$Basename, colnames(betas))]
 dim(betas)
 
 
-## run regression 
-if(class(pheno[,phenotype]) != "numeric") {
-  
-  for(i in which(is.na(res$Beta))){
-      modellmer<-lmer(betas[i,] ~  pheno[,phenotype] + pheno$Gender +  pheno$NeuN + pheno$Double  + pheno$Plate + pheno$Age +  PC$PC1  + (1|pheno$Brain_ID), REML =F, na.action=na.exclude)
-      res[i,1]<-fixef(modellmer)["pheno[, phenotype]1"]
-      res[i,2]<-summary(modellmer)$coefficients["pheno[, phenotype]1",2]
-      res[i,3]<-summary(modellmer)$coefficients["pheno[, phenotype]1",5]
-      res[i,4]<-summary(modellmer)$coefficients["pheno[, phenotype]1",4]
+## setting up parallel processors
 
+library(doParallel)
+cl<-makeCluster(20)
+registerDoParallel(cl)
+clusterEvalQ(cl, library(lmerTest))
+
+#Create function which performs analysis for a probes
+
+if(class(pheno$phenotype) != "numeric") {
+  #Create function which performs analysis for a probes
+  
+  testCpG<-function(row, pheno){
     
+    
+    modellmer<-lmer(betas[i,] ~ phenotype + Age + Gender+ NeuN+ Double + Plate + PC1 + (1|Brain_ID), data=pheno)
+    Beta<-fixef(modellmer)["phenotype1"]
+    SE<-summary(modellmer)$coefficients["phenotype1",2]
+    T<-summary(modellmer)$coefficients["phenotype1",4]
+    model.null<-lmer(betas[i,] ~ Age + Gender+ NeuN+ Double + Plate + PC1 + (1|Brain_ID), data=pheno)
+    P<-anova(modellmer,model.null)["modellmer","Pr(>Chisq)"]
+    #P<-summary(modellmer)$coefficients["phenotype1",5]
+    return(c(Beta,SE,P,T))
   }
+  
+  
+  ###Run EWAS using foreach() and %dopar% to tell R to run the analysis is parallel
+  res<-foreach(i=1:nrow(betas), .combine=rbind) %dopar%{
+    testCpG(betas[i,], pheno)	
+  }
+  
   
 } else {
   
-  for(i in which(is.na(res$Beta))){
-      modellmer<-lmer(betas[i,] ~ pheno[,phenotype]  + pheno$Gender +  pheno$NeuN + pheno$Double + pheno$Plate + pheno$Age + PC$PC1 + (1|pheno$Brain_ID), na.action=na.exclude)
-      res[i,1]<-fixef(modellmer)["pheno[, phenotype]"]
-      res[i,2]<-summary(modellmer)$coefficients["pheno[, phenotype]",2]
-      res[i,3]<-summary(modellmer)$coefficients["pheno[, phenotype]",5]
-      res[i,4]<-summary(modellmer)$coefficients["pheno[, phenotype]",4]
+  testCpG<-function(row, pheno){
     
+    
+    modellmer<-lmer(betas[i,] ~ phenotype + Age + Gender + NeuN + Double + Plate + PC1 + (1|Brain_ID), data=pheno)
+    Beta<-fixef(modellmer)["phenotype"]
+    SE<-summary(modellmer)$coefficients["phenotype",2]
+    T<-summary(modellmer)$coefficients["phenotype",4]
+    model.null<-lmer(betas[i,] ~ Age + Gender + NeuN + Double + Plate +PC1 + (1|Brain_ID), data=pheno)
+    P<-anova(modellmer,model.null)["modellmer","Pr(>Chisq)"]
+    #P<-summary(modellmer)$coefficients["phenotype",5]
+    return(c(Beta,SE,P,T))
+    
+  }
+  
+
+  ###Run EWAS using foreach() and %dopar% to tell R to run the analysis is parallel
+  res<-foreach(i=1:nrow(betas), .combine=rbind) %dopar%{
+    testCpG(betas[i,], pheno)	
   }
   
 }
 
-######################################################################################
-######################################################################################
+
+colnames(res)<-c("Beta", "SE", "P","T")
+rownames(res)<-rownames(betas)
+res<-as.data.frame(res)
 
 #Convert 0-1 proportions to percentages as they are easier to understand like this
-res<-as.data.frame(res)
 res[,"Beta"]<-res[,"Beta"]*100
 res[,"SE"]<-res[,"SE"]*100
 
