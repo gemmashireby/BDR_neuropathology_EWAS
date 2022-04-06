@@ -1,4 +1,4 @@
-##### master script to run EWAS in BDR single cell data
+##### master script to run EWAS in BDR purified nuclei data
 ##### Author:Gemma Shireby
 ##### Date: 13-04-2021
 
@@ -22,17 +22,10 @@ phenotype<-as.character(phenotype)
 
 setwd("")
 
-##########################################
-############# load libraries #############
-##########################################
-
-library(qqman)
-library(bacon)
 
 ##########################################
 ############# load files #################
 ##########################################
-
 
 load()
 pheno<-SampleSheet
